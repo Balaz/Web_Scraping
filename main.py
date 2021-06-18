@@ -1,45 +1,39 @@
 """
-Web Scraping practice with Beautiful Soup
+Reddit scraping project to analyze frequently mentioned stocks
 """
 import logging
+import json
 
-import requests
-from bs4 import BeautifulSoup
+import praw
 
-logging.basicConfig(filename='Debug.log',
+logging.basicConfig(filename='debug.log',
                     level=logging.DEBUG,
                     filemode='w',
                     format='[ %(levelname)-8s ] %(asctime)s - %(filename)-20s ' +
                            '{ %(funcName)23s(): %(lineno)-3s >> %(message)s',
                     datefmt='%H:%M:%S')
 
-def get_request(page_url:str) -> str:
-    """
-    Requesting an HTML page and checking the response from the server
-    :param page_url: str
-    :return: str
-    """
-    logging.info("___Requesting the site___")
+
+def get_credentials():
+    logging.info("__Getting the credentials__")
     try:
-        page_sourced = requests.get(page_url).content
-    except Exception as http_err:
-        logging.critical(http_err)
-    else:
-        return page_sourced
+        with open('reddit_credentials.json') as credentials:
+            reddit_app_info = json.load(credentials)["reddit_app_info"]
+    except FileExistsError as er:
+        logging.critical(er)
+
+    return praw.Reddit(client_id=reddit_app_info['client_id'], client_secret=reddit_app_info['client_secret'],
+                             user_agent=reddit_app_info['user_agent'])
 
 
-def main():
-    page_url = "https://www.wholefoodsmarket.com/sales-flyer?store-id=10005"
-    page_sourced = get_request(page_url)
-    html_content = BeautifulSoup(page_sourced, "html.parser")
+def scrape_reddit():
+    logging.info("__Starts scraping__")
+    reddit = get_credentials()
+    hot_posts = reddit.subreddit('wallstreetbets').hot(limit=10)
+    for post in hot_posts:
+        print("-" + post.title)
 
-    sale_items = html_content.findAll('h4', class_="w-sales-tile__product")
-    sale_item_titles = [i.text for i in sale_items]
-    print(sale_item_titles)
-
-
+    reddit.
 
 if __name__ == '__main__':
-    main()
-
-
+    scrape_reddit()
