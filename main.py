@@ -33,7 +33,7 @@ def scrape_reddit():
     for post in hot_posts:
         print("-" + post.title)
 
-    reddit.
+
 
 if __name__ == '__main__':
     scrape_reddit()
