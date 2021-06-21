@@ -37,8 +37,8 @@ def get_revolut_stocks_name() -> list:
     rows = table_body.find_all('tr')
     list_of_stocks = []
     for row in rows:
-        asd = row.find_all('td')
-        list_of_stocks.append(asd[2].text.strip())
+        stock_data = row.find_all('td')
+        list_of_stocks.append(stock_data[2].text.strip())
 
     return list_of_stocks
 
