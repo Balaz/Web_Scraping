@@ -4,7 +4,7 @@ import requests
 import bs4
 
 
-def get_site(site_URL):
+def get_site(site_URL) -> requests.Response:
     """
     Sends a GET request to a website and checking it for exceptions
     :param str
