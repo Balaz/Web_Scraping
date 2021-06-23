@@ -1,19 +1,22 @@
 """
 Reddit scraping project to analyze frequently mentioned stocks generated from posts, influencers or social media
 """
-import json
 from collections import Counter
 from collections import deque
 from collections import defaultdict
+import json
+import praw
+import pandas as pd
 
 from my_logging import logging
-import praw
 import web_scraper
 
+
 list_of_revolut_stocks = web_scraper.get_revolut_stocks_name()
+results = defaultdict(list)
 
 
-def get_credentials():
+def get_credentials() -> praw.Reddit:
     """
     Creates a Reddit scraper and checks all the credentials for it.
     :return: Reddit instance
@@ -29,7 +32,11 @@ def get_credentials():
                        user_agent=reddit_app_info['user_agent'])
 
 
-def scrape_comments(post):
+def score_comment(comment):
+    print(comment.body, comment.score)
+
+
+def scrape_comments(post) -> None:
     """
     Scraping comments of a reddit post with DFS
     :param post: Subreddit instance
@@ -42,19 +49,22 @@ def scrape_comments(post):
     comment_queue = deque(post.comments[:])
     while comment_queue:
         comment = comment_queue.popleft()
-        print(comment.body, comment.score)
+        score_comment(comment)
         comment_queue.extendleft(reversed(comment.replies))
 
 
-def check_stock_names_in_posts(wallstreetbets_hot_posts) -> list(praw.reddit.Subreddit):
+def check_stock_names_in_posts(wallstreetbets_hot_posts) -> list():
     """
     It checks if someone mentioned a revolut stock in the title of a post and collects and returns them in a list
     :param wallstreetbets_hot_posts: list of subreddit instances
     :return: list of subreddit instances
     """
-    good_posts = []
+    result = defaultdict()
+    result.update({"stocks": ["mentions", "posts"]})
+
     stock_mentioned_posts = defaultdict(list)
     mentioned_stocks_counter = Counter()
+
     for post in wallstreetbets_hot_posts:
         for stock in list_of_revolut_stocks:
             # I only catch uppercased stocks in posts because of these kind of stocks: A, CARS, ALL, ON etc...
@@ -63,22 +73,28 @@ def check_stock_names_in_posts(wallstreetbets_hot_posts) -> list(praw.reddit.Sub
                 stock_mentioned_posts[stock].append(post)
                 mentioned_stocks_counter.update([stock])
 
-    for mentioned_stock in mentioned_stocks_counter.most_common(3):
-        good_posts.extend(stock_mentioned_posts[mentioned_stock[0]])
+    for mentioned_stock, counter in mentioned_stocks_counter.items():
+        result.update({mentioned_stock: [counter, stock_mentioned_posts[mentioned_stock]]})
 
-    return good_posts
+    return result
 
 
-def scrape_reddit_posts():
+def scrape_reddit_posts() -> None:
     logging.info("__Scraping reddit posts__")
     reddit = get_credentials()
     wallstreetbets_hot_posts = reddit.subreddit('wallstreetbets').top("day")
 
     relevant_posts = check_stock_names_in_posts(wallstreetbets_hot_posts)
-    for post in relevant_posts[:1]:
-        print(post.title)
-        scrape_comments(post)
 
+    df = pd.DataFrame(relevant_posts)
+    df = df.transpose()
+    df.to_csv("data/worthy_stocks.csv", header=None)
+
+    """
+    for post in relevant_posts:
+        print(post.title)
+        # scrape_comments(post)
+    """
     # TODO:
     #  Ertekelni hogy egy comment vagy title az pozitiv vagy negativ
     #    - egy eredmenyt kiolvasni - troll cikk-e vagy "megbizhato" - igy maga a reszveny
