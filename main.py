@@ -4,97 +4,102 @@ Reddit scraping project to analyze frequently mentioned stocks generated from po
 from collections import Counter
 from collections import deque
 from collections import defaultdict
-import json
-import praw
+
 import pandas as pd
 
 from my_logging import logging
 import web_scraper
 
 
-list_of_revolut_stocks = web_scraper.get_revolut_stocks_name()
 results = defaultdict(list)
 
 
-def get_credentials() -> praw.Reddit:
+def create_csv_file(relevant_posts) -> None:
     """
-    Creates a Reddit scraper and checks all the credentials for it.
-    :return: Reddit instance
+    Creates a database from the scraped data from reddit
+    :param relevant_posts: dictionary
+    :return: None
     """
-    logging.info("__Getting the Reddit credentials__")
-    try:
-        with open('reddit_credentials.json') as credentials:
-            reddit_app_info = json.load(credentials)["reddit_app_info"]
-    except FileExistsError as er:
-        logging.critical(er)
-
-    return praw.Reddit(client_id=reddit_app_info['client_id'], client_secret=reddit_app_info['client_secret'],
-                       user_agent=reddit_app_info['user_agent'])
+    logging.info("__Creating CSV File__")
+    df = pd.DataFrame.from_dict(relevant_posts, orient="index", columns=["mentions", "posts"])
+    df = df.sort_values(by=["mentions"], ascending=False, kind="mergesort")
+    df.to_csv("data/worthy_stocks_on_revolut.csv")
 
 
 def score_comment(comment):
-    print(comment.body, comment.score)
+    if comment.author == "VisualMod":
+        return
+    else:
+        print(comment.body, comment.score)
 
 
-def scrape_comments(post) -> None:
+def scrape_comments(all_mentioned_stocks_df) -> None:
     """
     Scraping comments of a reddit post with DFS
-    :param post: Subreddit instance
+    :param relevant_posts: dictionary
     :return: None
     """
     logging.info("__Scraping comments of a post__")
-    # The max depth of the comments
-    post.comments.replace_more(limit=None)
-    # Grabs all the top level comments
-    comment_queue = deque(post.comments[:])
-    while comment_queue:
-        comment = comment_queue.popleft()
-        score_comment(comment)
-        comment_queue.extendleft(reversed(comment.replies))
 
+    # TODO:
+    #  - uj lista a postok komment alapjan torteno ertekeleseivel
+    #  - amit hozzaadunk majd a meglevo dictionaryhoz uj oszlopkent
+    #  - plusz 1 oszlop hogy vegeredmenyben pos, semleges vagy negativ az ertekeles
 
-def check_stock_names_in_posts(wallstreetbets_hot_posts) -> list():
-    """
-    It checks if someone mentioned a revolut stock in the title of a post and collects and returns them in a list
-    :param wallstreetbets_hot_posts: list of subreddit instances
-    :return: list of subreddit instances
-    """
-    result = defaultdict()
-    result.update({"stocks": ["mentions", "posts"]})
+# --------------------------------------------
+    # Checking the post from the database
+    #   -> No need to scrape the website for posts every time while figuring out how to score comments
+    #  we only need one stock
+    relevant_posts = pd.read_csv("data/worthy_stocks_on_revolut.csv", nrows=1, usecols=["posts"])
+    for index, row in relevant_posts.iterrows():
+        # creating a list from a string
+        list_of_posts_ids = row.values[0].strip("[]").replace("'", "").split(", ")
 
-    stock_mentioned_posts = defaultdict(list)
-    mentioned_stocks_counter = Counter()
-
-    for post in wallstreetbets_hot_posts:
-        for stock in list_of_revolut_stocks:
-            # I only catch uppercased stocks in posts because of these kind of stocks: A, CARS, ALL, ON etc...
-            if (" " + stock + " ") in (" " + post.title + " ") or \
-                    (" " + stock + " ") in ("$" + post.title + " "):
-                stock_mentioned_posts[stock].append(post)
-                mentioned_stocks_counter.update([stock])
-
-    for mentioned_stock, counter in mentioned_stocks_counter.items():
-        result.update({mentioned_stock: [counter, stock_mentioned_posts[mentioned_stock]]})
-
-    return result
-
-
-def scrape_reddit_posts() -> None:
-    logging.info("__Scraping reddit posts__")
-    reddit = get_credentials()
-    wallstreetbets_hot_posts = reddit.subreddit('wallstreetbets').top("day")
-
-    relevant_posts = check_stock_names_in_posts(wallstreetbets_hot_posts)
-
-    df = pd.DataFrame(relevant_posts)
-    df = df.transpose()
-    df.to_csv("data/worthy_stocks.csv", header=None)
-
-    """
-    for post in relevant_posts:
+    #  we only need one post
+    for post_id in list_of_posts_ids[:1]:
+        post = reddit.submission(id=post_id)
         print(post.title)
-        # scrape_comments(post)
+# --------------------------------------------
+
+        # The max depth of the comments
+        post.comments.replace_more(limit=None)
+        # Grabs all the top level comments
+        comment_queue = deque(post.comments[:])
+        while comment_queue:
+            comment = comment_queue.popleft()
+            score_comment(comment)
+            comment_queue.extendleft(reversed(comment.replies))
+
+
+
+def filter_rev_stocks(all_rev_stocks_df) -> pd.DataFrame:
     """
+    We are care about stocks, which are mentioned in the posts
+    :param wallstreetbets_hot_posts:
+    :return: pd.DataFrame
+    """
+    wallstreetbets_hot_posts = web_scraper.scrape_wallstreetbets_posts()
+
+    new_dict = defaultdict(list)
+    for post in wallstreetbets_hot_posts:
+        for stock in all_rev_stocks_df["Symbol"]:
+            # I only catch uppercased stocks in posts because of these kind of stocks: A, CARS, ALL, ON etc...
+            if (" " + stock + " ") in (" " + post.title + " "):
+                new_dict[stock].append(post.id)
+
+    df1 = pd.DataFrame([(k, v) for k, v in new_dict.items()], columns=["Symbol", "Post IDs"])
+
+    all_mentioned_stocks_df = all_rev_stocks_df.merge(df1, how="inner", on="Symbol")
+
+    all_mentioned_stocks_df.to_csv("data/mentioned_revolut_stocks.csv")
+
+def main() -> None:
+    logging.info("__Scraping reddit posts__")
+
+    all_rev_stocks_df = web_scraper.scrape_all_stocks_from_revolut()
+    all_mentioned_stocks_df = filter_rev_stocks(all_rev_stocks_df)
+    # scrape_comments(all_mentioned_stocks_df)
+
     # TODO:
     #  Ertekelni hogy egy comment vagy title az pozitiv vagy negativ
     #    - egy eredmenyt kiolvasni - troll cikk-e vagy "megbizhato" - igy maga a reszveny
@@ -109,4 +114,5 @@ def scrape_reddit_posts() -> None:
 
 
 if __name__ == '__main__':
-    scrape_reddit_posts()
+    main()
+    # scrape_comments()
