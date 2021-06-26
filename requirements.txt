@@ -13,3 +13,4 @@ soupsieve==2.2.1
 update-checker==0.18.0
 urllib3==1.26.5
 websocket-client==1.1.0
+pandas~=1.2.5

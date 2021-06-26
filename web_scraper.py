@@ -22,7 +22,7 @@ def get_site(site_URL) -> requests.Response:
         return response
 
 
-def scrape_all_stocks_from_revolut() -> pd.DataFrame:
+def get_all_stocks_from_revolut() -> pd.DataFrame:
     """
     Scrapes all the stocks's names used by Revolut from globefunder.com
     and returns with a dataframe
@@ -55,7 +55,15 @@ def get_credentials() -> praw.Reddit:
                        user_agent=reddit_app_info['user_agent'])
 
 
-def scrape_wallstreetbets_posts():
+def get_wallstreetbets_posts():
     reddit = get_credentials()
     return reddit.subreddit('wallstreetbets').top("day")
+
+
+def get_comments(post_id):
+    reddit = get_credentials()
+    return reddit.submission(id=post_id)
+
+
+
 
