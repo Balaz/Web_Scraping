@@ -32,8 +32,10 @@ def get_all_stocks_from_revolut() -> pd.DataFrame:
 
     all_revolut_stocks_site_URL = "https://globefunder.com/revolut-stocks-list/"
     site_response = get_site(all_revolut_stocks_site_URL)
-
+    # It reads only the first table it can find and what we need
     df = pd.read_html(site_response.text)[0]
+    df = df[[1, 2]]
+    df.columns = ["Company name", "Symbol"]
     df = df.reindex(columns=["Symbol", "Company name"])
     df.to_csv("data/all_revolut_stocks.csv")
     return df
