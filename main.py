@@ -9,6 +9,7 @@ from my_logging import logging
 import web_scraper
 import sentiment_analysis
 
+
 def create_csv_file() -> None:
     """"""
     logging.info("__Creating CSV File__")
@@ -53,7 +54,8 @@ def scrape_comments(mentioned_revolut_stocks_df) -> None:
 
             #  Popularity per post
             avg_per_post = sum(popularity_per_comment) / len(popularity_per_comment)
-            print("Average popularity", avg_per_post)
+            if avg_per_post > 0.1:
+                print("Average popularity", avg_per_post)
             popularity_per_stock.append(avg_per_post)
         avg_per_stock = sum(popularity_per_stock) / len(popularity_per_stock)
 
